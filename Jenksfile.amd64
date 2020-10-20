@@ -1,0 +1,61 @@
+pipeline {
+    agent {
+        label 'amd64'
+    }
+
+    environment {
+        creds_dockerhub = credentials('dockerhub') // dockerhub is user/pass (token) credential stored as Jenkins cred
+        creds_rhcatalog = credentials('rhcatalog') // Red Hat catalog is user/pass (token) credential stored as Jenkins cred
+        image = 'eltondesouza/java-hello-world:s390x-latest' // Replace with your [dockerid]/java-hello-world:s390x-latest
+        registry = 'https://github.com/OpenShift-Z/hello-world-http-java.git' // Replace with your fork of the hello-world code
+        oc_token =  credentials('octoken') // Replace with OpenShift Token from GUI
+    }
+
+    stages {
+        stage('Pull Source') {
+            steps {
+                // more realiable than pull --force. There are better mechanisms for larger code bases
+                sh 'rm -rf hello-world-http-java'
+                sh 'git clone $registry' 
+            }
+        }
+        stage('Build image') {
+            steps {
+                dir('hello-world-http-java') {
+                    // _USR and _PSW are Jenkins inbuild mechanisms to extract user and pass from encrypted credentials
+                    sh 'podman login registry.redhat.io -u $creds_rhcatalog_USR -p $creds_rhcatalog_PSW' // Pulling official RHEL7 OpenJDK image here
+                    sh 'podman build -t java-hello-world -f Dockerfile '
+                }
+            }
+        }
+        stage('Tagging image') {
+            steps {
+                sh 'podman tag java-hello-world $image'
+            }
+        }
+        stage('Pushing image') {
+            steps {
+                // _USR and _PSW are Jenkins inbuild mechanisms to extract user and pass from encrypted credentials
+                sh 'podman login docker.io -u $creds_dockerhub_USR -p $creds_dockerhub_PSW'
+                sh 'podman push $image'
+            }
+        }
+        stage('Amending manifest') {
+            steps {
+                sh 'podman login docker.io -u $creds_dockerhub_USR -p $creds_dockerhub_PSW'
+                sh 'podman manifest create eltondesouza/java-hello-world:latest --amend eltondesouza/java-hello-world:amd64-latest --amend eltondesouza/java-hello-world:s390x-latest'
+                sh 'podman manifest push eltondesouza/java-hello-world:latest'
+            }
+        }
+
+        stage('Deploy Image to OpenShift') {
+            agent { label 'master' }
+            steps {
+                sh 'oc login --token=$oc_token --server=https://c101-e.us-east.containers.cloud.ibm.com:32149' // Cloud cluster
+                sh 'oc delete is/java-hello-world || true' // Delete existing stream
+                sh 'oc delete deploymentconfigs java-hello-world || true' // & deployment config
+                sh 'oc new-app eltondesouza/java-hello-world' // Push new stream
+            }
+        }
+    }
+}
