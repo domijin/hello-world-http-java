@@ -4,7 +4,7 @@ pipeline {
     }
 
     environment {
-        creds_dockerhub = credentials('dockerhub')                               // dockerhub is user/pass (token) credential stored as Jenkins cred
+        creds_dockerhub = credentials('dockerhub')                              // dockerhub is user/pass (token) credential stored as Jenkins cred
         creds_rhcatalog = credentials('rhcatalog')                              // Red Hat catalog is user/pass (token) credential stored as Jenkins cred
         image = 'eltondesouza/java-hello-world'                                 // Replace with your [dockerid]/java-hello-world:s390x-latest
         registry = 'https://github.com/OpenShift-Z/hello-world-http-java.git'   // Replace with your fork of the hello-world code
@@ -31,7 +31,7 @@ pipeline {
                     sh 'buildah rmi $image:$platform_tag || true'  // cleanup
                     sh 'buildah rmi $image:latest || true' // cleanup
                     sh 'podman login registry.redhat.io -u $creds_rhcatalog_USR -p $creds_rhcatalog_PSW' // Pulling official RHEL7 OpenJDK image here
-                    sh 'podman build --no-cache=true -t $image:$platform_tag -f Dockerfile '
+                    sh 'sudo -n podman build --no-cache=true -t $image:$platform_tag -f Dockerfile '
                 }
             }
         }
@@ -42,7 +42,7 @@ pipeline {
                 sh 'curl -X DELETE -u $creds_dockerhub_USR:$creds_dockerhub_PSW $registry_server/$image:$platform_tag'
                 sh 'curl -X DELETE -u $creds_dockerhub_USR:$creds_dockerhub_PSW $registry_server/$image:latest'
                 sh 'podman login docker.io -u $creds_dockerhub_USR -p $creds_dockerhub_PSW'
-                sh 'podman push $image:$platform_tag'
+                sh 'sudo -n podman push $image:$platform_tag'
             }
         }
 
@@ -51,17 +51,17 @@ pipeline {
                 sh 'podman login docker.io -u $creds_dockerhub_USR -p $creds_dockerhub_PSW'
                 sh 'buildah manifest create $image:latest || true'
                 sh 'buildah manifest add --override-arch=amd64 --override-os=linux --os=linux --arch=$platform_os $image:latest docker://$image:$platform_tag'
-
             }
         }
 
         stage('Deploy Image to OpenShift') {
             steps {
-                sh 'oc login --token=$oc_token --server=$ocp_server'
+                sh 'oc login --token=$oc_token --insecure-skip-tls-verify --server=$ocp_server'
                 sh 'oc delete is/java-hello-world || true'                  // Delete existing stream
                 sh 'oc delete deploymentconfigs java-hello-world || true'   // & deployment config
                 sh 'oc delete deployment java-hello-world || true'          // & deployments config 
                 sh 'oc delete service java-hello-world || true'             // & service config 
+                sh 'oc delete route java-hello-world || true'             // & service config 
                 sh 'oc new-app $image'                                      // Push new stream
             }
         }
