@@ -1,0 +1,35 @@
+pipeline {
+    agent {
+        label 's390x'
+    }
+
+    environment {
+        git = 'https://github.com/OpenShift-Z/hello-world-http-java.git'   // Replace with your fork of the hello-world code
+        oc_token =  credentials('octoken-s390x')                                // Replace with OpenShift Token from GUI
+        ocp_server = 'https://api.ocp1.ocp.local:6443'
+    }
+
+    stages {
+        stage('Create Project') {
+            steps {
+                sh 'oc login --token=$oc_token --insecure-skip-tls-verify --server=$ocp_server'
+                sh 'oc delete project java-hello-world'
+                sh 'oc new-project java-hello-world'
+            }
+        }
+
+        stage('Build and deploy') {
+            steps {
+                sh 'oc new-app $git'
+                sh 'sleep 10'
+            }
+        }
+
+        stage('Expose Route') {
+            steps {
+                sh 'oc expose svc/hello-world-http-java'
+                sh 'Go to : http://hello-world-http-java-java-hello-world.apps.ocp1.ocp.local/'
+            }
+        }
+    }
+}
