@@ -5,7 +5,7 @@ pipeline {
 
     environment {
         git = 'https://github.com/OpenShift-Z/hello-world-http-java.git'   // Replace with your fork of the hello-world code
-        oc_token =  credentials('octoken-s390x')                                // Replace with OpenShift Token from GUI
+        oc_token =  credentials('octoken-s390x')                           // Replace with OpenShift Token from GUI
         ocp_server = 'https://api.ocp1.ocp.local:6443'
     }
 
