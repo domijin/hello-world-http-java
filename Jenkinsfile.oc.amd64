@@ -13,7 +13,8 @@ pipeline {
         stage('Create Project') {
             steps {
                 sh 'oc login --token=$oc_token --insecure-skip-tls-verify --server=$ocp_server'
-                sh 'oc delete project java-hello-world'
+                sh 'oc delete project java-hello-world || true'
+                sh 'sleep 5'
                 sh 'oc new-project java-hello-world'
             }
         }
