@@ -1,4 +1,4 @@
-FROM registry.redhat.io/openjdk/openjdk-11-rhel8:latest
+FROM default/openjdk-11-rhel8:latest
 COPY HelloWorld.java .
 EXPOSE 8000
 

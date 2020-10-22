@@ -11,23 +11,27 @@ pipeline {
         app = 'java-hello-world'
     }
 
-    stages {
+   stages {
         stage('Create Project') {
             steps {
                 sh 'oc login --token=$oc_token --insecure-skip-tls-verify --server=$ocp_server'
-                sh 'oc delete namespace $app --wait=true || true'
-                sh 'oc new-project java-hello-world'
-                sh 'kubectl create -f $pullSecret -n=$app'
-                sh 'oc secrets link builder 13358228-test19918811112-pull-secret -n=$app'
-                sh 'oc secrets link default 13358228-test19918811112-pull-secret -n=$app'
+                //sh 'oc delete namespace $app --wait=true || true'
+                //sh 'oc new-project java-hello-world'
+                //sh 'kubectl create -f $pullSecret -n=$app'
+                //sh 'oc secrets link builder 13358228-test19918811112-pull-secret -n=$app'
+                //sh 'oc secrets link default 13358228-test19918811112-pull-secret -n=$app'
             }
         }
 
         stage('Build and deploy') {
             steps {
+                sh 'oc delete bc hello-world-http-java -n=$app || true'
+                sh 'oc delete deployment hello-world-http-java -n=$app || true'
+                sh 'oc delete service hello-world-http-java -n=$app || true'
+                sh 'oc delete route hello-world-http-java -n=$app || true'
                 sh 'oc new-app $git -n=$app'
                 sh 'sleep 5'
-                sh 'oc logs -f bc/hello-world-http-java -n=java-hello-world'
+                sh 'oc logs -f bc/hello-world-http-java -n=$app'
             }
         }
 
