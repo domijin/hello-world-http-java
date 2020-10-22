@@ -26,7 +26,8 @@ pipeline {
         stage('Build and deploy') {
             steps {
                 sh 'oc new-app $git -n=$app'
-                sh 'sleep 15'
+                sh 'sleep 5'
+                sh 'oc logs -f bc/hello-world-http-java -n=java-hello-world'
             }
         }
 
