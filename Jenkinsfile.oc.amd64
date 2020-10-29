@@ -31,13 +31,13 @@ pipeline {
                 sh 'oc delete route hello-world-http-java -n=$app || true'
                 sh 'oc new-app $git -n=$app'
                 sh 'oc logs -f bc/hello-world-http-java -n=java-hello-world'
-                sh 'sleep 10'
+                sh 'sleep 15'
             }
         }
 
         stage('Expose Route') {
             steps {
-                sh 'oc expose svc/hello-world-http-java'
+                sh 'oc expose svc/hello-world-http-java -n=$app'
                 sh 'oc get routes -n=$app -o json | jq -r \'.items[0].spec.host\''
             }
         }
