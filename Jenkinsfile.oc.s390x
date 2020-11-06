@@ -30,6 +30,7 @@ pipeline {
                 sh 'oc delete service hello-world-http-java -n=$app || true'
                 sh 'oc delete route hello-world-http-java -n=$app || true'
                 sh 'oc new-app $git -n=$app'
+                sh 'sleep 15'
                 sh 'oc logs -f bc/hello-world-http-java -n=$app'
                 sh 'sleep 15'
             }

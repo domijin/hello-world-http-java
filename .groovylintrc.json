@@ -4,6 +4,9 @@
         "CompileStatic": {
             "enabled": false
         },
+        "DuplicateStringLiteral": {
+            "enabled": false
+        },
         "LineLength": {
             "enabled": false
         }
