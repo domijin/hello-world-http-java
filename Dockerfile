@@ -3,4 +3,5 @@ COPY HelloWorld.java .
 EXPOSE 8000
 
 ## Leverage Java 11's ability to run Java files directly 😊
+COPY agent .
 ENTRYPOINT ["java","HelloWorld.java"]
