@@ -1,6 +1,6 @@
-FROM registry.redhat.io/openjdk/openjdk-11-rhel8:latest
-COPY HelloWorld.java .
+FROM openjdk:8-jre-alpine
+COPY HelloWorld.jar .
 EXPOSE 8000
 
-## Leverage Java 11's ability to run Java files directly 😊
-ENTRYPOINT ["java","HelloWorld.java"]
+## Run the Java application
+ENTRYPOINT ["java", "-jar", "HelloWorld.jar"]
