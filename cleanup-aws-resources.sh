@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-# Colors for output
+# AWS Resource Cleanup Script
+# This script cleans up Elastic Beanstalk resources while preserving reusable infrastructure:
+# - IAM roles and instance profiles (reusable for future deployments)
+# - S3 bucket (reusable for future deployments)
+# - Only removes application-specific resources
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -118,55 +122,55 @@ else
 fi
 echo ""
 
-# Step 5: Delete S3 Bucket
-print_status "Step 5: Deleting S3 bucket..."
-if aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
-    aws s3 rb "s3://$S3_BUCKET" --force
-    print_success "S3 bucket deleted"
-else
-    print_status "S3 bucket doesn't exist"
-fi
-echo ""
+# # Step 5: Delete S3 Bucket
+# print_status "Step 5: Deleting S3 bucket..."
+# if aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
+#     aws s3 rb "s3://$S3_BUCKET" --force
+#     print_success "S3 bucket deleted"
+# else
+#     print_status "S3 bucket doesn't exist"
+# fi
+# echo ""
 
-# Step 6: Delete IAM Instance Profile
-print_status "Step 6: Deleting IAM instance profile..."
-if aws iam get-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
-    aws iam remove-role-from-instance-profile \
-        --instance-profile-name aws-elasticbeanstalk-ec2-role \
-        --role-name aws-elasticbeanstalk-ec2-role
+# # Step 6: Delete IAM Instance Profile
+# print_status "Step 6: Deleting IAM instance profile..."
+# if aws iam get-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
+#     aws iam remove-role-from-instance-profile \
+#         --instance-profile-name aws-elasticbeanstalk-ec2-role \
+#         --role-name aws-elasticbeanstalk-ec2-role
     
-    aws iam delete-instance-profile \
-        --instance-profile-name aws-elasticbeanstalk-ec2-role
+#     aws iam delete-instance-profile \
+#         --instance-profile-name aws-elasticbeanstalk-ec2-role
     
-    print_success "Instance profile deleted"
-else
-    print_status "Instance profile doesn't exist"
-fi
-echo ""
+#     print_success "Instance profile deleted"
+# else
+#     print_status "Instance profile doesn't exist"
+# fi
+# echo ""
 
-# Step 7: Delete IAM Role
-print_status "Step 7: Deleting IAM role..."
-if aws iam get-role --role-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
-    # Detach policies
-    POLICIES=$(aws iam list-attached-role-policies \
-        --role-name aws-elasticbeanstalk-ec2-role \
-        --query "AttachedPolicies[].PolicyArn" \
-        --output text 2>/dev/null || echo "")
+# # Step 7: Delete IAM Role
+# print_status "Step 7: Deleting IAM role..."
+# if aws iam get-role --role-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
+#     # Detach policies
+#     POLICIES=$(aws iam list-attached-role-policies \
+#         --role-name aws-elasticbeanstalk-ec2-role \
+#         --query "AttachedPolicies[].PolicyArn" \
+#         --output text 2>/dev/null || echo "")
     
-    for policy in $POLICIES; do
-        if [ ! -z "$policy" ]; then
-            aws iam detach-role-policy \
-                --role-name aws-elasticbeanstalk-ec2-role \
-                --policy-arn "$policy"
-        fi
-    done
+#     for policy in $POLICIES; do
+#         if [ ! -z "$policy" ]; then
+#             aws iam detach-role-policy \
+#                 --role-name aws-elasticbeanstalk-ec2-role \
+#                 --policy-arn "$policy"
+#         fi
+#     done
     
-    aws iam delete-role --role-name aws-elasticbeanstalk-ec2-role
-    print_success "IAM role deleted"
-else
-    print_status "IAM role doesn't exist"
-fi
-echo ""
+#     aws iam delete-role --role-name aws-elasticbeanstalk-ec2-role
+#     print_success "IAM role deleted"
+# else
+#     print_status "IAM role doesn't exist"
+# fi
+# echo ""
 
 # Step 8: Clean up EC2 instances (if any orphaned)
 print_status "Step 8: Checking for orphaned EC2 instances..."
@@ -217,15 +221,18 @@ fi
 echo ""
 
 print_success "=== CLEANUP COMPLETE ==="
-print_status "All AWS resources have been cleaned up."
+print_status "AWS resources have been cleaned up."
 print_status "Note: Some resources may take a few minutes to be fully deleted."
 echo ""
 print_status "Resources cleaned up:"
 echo "- Elastic Beanstalk environment"
 echo "- Application versions"
 echo "- Elastic Beanstalk application"
-echo "- S3 bucket and objects"
-echo "- IAM instance profile"
-echo "- IAM role"
+echo "- S3 objects (bucket preserved for reuse)"
 echo "- Orphaned EC2 instances (if confirmed)"
-echo "- Orphaned security groups (if confirmed)" 
+echo "- Orphaned security groups (if confirmed)"
+echo ""
+print_status "Resources preserved for reuse:"
+echo "- IAM instance profile (aws-elasticbeanstalk-ec2-role)"
+echo "- IAM role (aws-elasticbeanstalk-ec2-role)"
+echo "- S3 bucket (elasticbeanstalk-$REGION-$ACCOUNT_ID)" 

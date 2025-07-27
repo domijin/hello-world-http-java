@@ -1,24 +1,56 @@
-Simple HTTP Server
-=======================
+# Hello World HTTP Java
 
-Very simple HTTP Server serving on port 8000
+A minimal Java HTTP server that serves "Hello World!" on port 8080.
 
-To compile, package and run:
+## Quick Start
 
+### Local Development
 ```bash
-javac HelloWorld.java
-jar cmvf META-INF/MANIFEST.MF HelloWorld.jar *.class
+# Build the application
+./build.sh
+
+# Run the application
 java -jar HelloWorld.jar
 ```
 
-or
+The server will be available at `http://localhost:8080`
 
-```
-./build.sh
+### AWS Deployment
+
+This project is configured for deployment to AWS Elastic Beanstalk using GitHub Actions CI/CD.
+
+#### Prerequisites
+- AWS CLI configured with appropriate credentials
+- Java 8 or higher
+
+#### Setup AWS Resources
+```bash
+# Run the setup script to create AWS resources
+./setup-aws-elasticbeanstalk.sh
 ```
 
-Starting Java 11, you can run the Java file directly:
+#### Cleanup AWS Resources
+```bash
+# Clean up AWS resources when done
+./cleanup-aws-resources.sh
+```
 
-```
-java HelloWorld.java
-```
+## Project Structure
+
+- `HelloWorld.java` - Main application code
+- `build.sh` - Build script
+- `setup-aws-elasticbeanstalk.sh` - AWS setup script
+- `cleanup-aws-resources.sh` - AWS cleanup script
+- `.github/workflows/cicd.yml` - GitHub Actions CI/CD pipeline
+
+## CI/CD Pipeline
+
+The GitHub Actions pipeline automatically:
+1. Builds the Java application
+2. Uploads to AWS S3
+3. Deploys to Elastic Beanstalk
+4. Performs health checks
+
+## License
+
+MIT License - see LICENSE file for details.

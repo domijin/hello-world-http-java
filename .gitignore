@@ -1,3 +1,11 @@
 *.class
 *.jar
-.env
+*.war
+*.ear
+target/
+build/
+out/
+.idea/
+*.iml
+.vscode/
+*.log

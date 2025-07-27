@@ -50,6 +50,11 @@ VERSION_LABEL="v-$(date +%Y%m%d%H%M%S)"
 SOLUTION_STACK="64bit Amazon Linux 2023 v4.6.1 running Corretto 8"
 
 print_status "=== AWS Elastic Beanstalk Setup Script ==="
+print_status "This script intelligently sets up AWS resources:"
+print_status "- Checks for existing resources and reuses them if usable"
+print_status "- Only creates new resources when necessary"
+print_status "- Ensures all required policies and attachments are in place"
+echo ""
 print_status "App Name: $APP_NAME"
 print_status "Environment: $ENV_NAME"
 print_status "Region: $REGION"
@@ -80,10 +85,11 @@ print_success "Prerequisites check passed"
 echo ""
 
 # Step 3: Ensure S3 Bucket Exists
-print_status "Step 3: Creating S3 bucket if it doesn't exist..."
+print_status "Step 3: Checking S3 bucket..."
 if aws s3 ls "s3://$S3_BUCKET" 2>/dev/null; then
-    print_success "S3 bucket already exists"
+    print_success "S3 bucket already exists and is accessible"
 else
+    print_status "Creating S3 bucket..."
     aws s3 mb "s3://$S3_BUCKET" --region $REGION
     print_success "S3 bucket created"
 fi
@@ -96,11 +102,22 @@ print_success "JAR uploaded to S3"
 echo ""
 
 # Step 5: Create IAM Role and Instance Profile
-print_status "Step 5: Setting up IAM role and instance profile..."
+print_status "Step 5: Checking IAM role and instance profile..."
 
-# Check if role exists
+# Check if role exists and has required policies
 if aws iam get-role --role-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
     print_success "IAM role already exists"
+    
+    # Check if required policy is attached
+    if aws iam list-attached-role-policies --role-name aws-elasticbeanstalk-ec2-role --query "AttachedPolicies[?PolicyArn=='arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier']" --output text 2>/dev/null | grep -q "AWSElasticBeanstalkWebTier"; then
+        print_success "Required policy already attached"
+    else
+        print_status "Attaching required policy to existing role..."
+        aws iam attach-role-policy \
+            --role-name aws-elasticbeanstalk-ec2-role \
+            --policy-arn arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        print_success "Policy attached"
+    fi
 else
     print_status "Creating IAM role..."
     aws iam create-role \
@@ -122,12 +139,23 @@ else
         --role-name aws-elasticbeanstalk-ec2-role \
         --policy-arn arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
     
-    print_success "IAM role created"
+    print_success "IAM role created with required policy"
 fi
 
-# Check if instance profile exists
+# Check if instance profile exists and has the role
 if aws iam get-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role 2>/dev/null; then
     print_success "Instance profile already exists"
+    
+    # Check if role is attached to instance profile
+    if aws iam get-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role --query "InstanceProfile.Roles[?RoleName=='aws-elasticbeanstalk-ec2-role']" --output text 2>/dev/null | grep -q "aws-elasticbeanstalk-ec2-role"; then
+        print_success "Role already attached to instance profile"
+    else
+        print_status "Attaching role to existing instance profile..."
+        aws iam add-role-to-instance-profile \
+            --instance-profile-name aws-elasticbeanstalk-ec2-role \
+            --role-name aws-elasticbeanstalk-ec2-role
+        print_success "Role attached to instance profile"
+    fi
 else
     print_status "Creating instance profile..."
     aws iam create-instance-profile \
@@ -137,15 +165,16 @@ else
         --instance-profile-name aws-elasticbeanstalk-ec2-role \
         --role-name aws-elasticbeanstalk-ec2-role
     
-    print_success "Instance profile created"
+    print_success "Instance profile created with role"
 fi
 echo ""
 
 # Step 6: Create Beanstalk Application
-print_status "Step 6: Creating Beanstalk application..."
+print_status "Step 6: Checking Beanstalk application..."
 if aws elasticbeanstalk describe-applications --region $REGION --query "Applications[?ApplicationName=='$APP_NAME']" 2>/dev/null | grep -q "$APP_NAME"; then
     print_success "Application already exists"
 else
+    print_status "Creating Beanstalk application..."
     aws elasticbeanstalk create-application --application-name "$APP_NAME" --region $REGION
     print_success "Application created"
 fi
@@ -180,7 +209,7 @@ fi
 echo ""
 
 # Step 9: Create Environment
-print_status "Step 9: Creating environment..."
+print_status "Step 9: Checking environment..."
 ENV_EXISTS=$(aws elasticbeanstalk describe-environments \
     --application-name "$APP_NAME" \
     --region $REGION \
@@ -200,13 +229,52 @@ if [ "$ENV_EXISTS" -eq 0 ]; then
         --region $REGION
     print_success "Environment created"
 else
-    print_status "Environment already exists, updating to new version..."
-    aws elasticbeanstalk update-environment \
+    # Check if environment is in a usable state
+    ENV_STATUS=$(aws elasticbeanstalk describe-environments \
         --application-name "$APP_NAME" \
         --environment-name "$ENV_NAME" \
-        --version-label "$VERSION_LABEL" \
-        --region $REGION
-    print_success "Environment updated"
+        --region $REGION \
+        --query "Environments[0].Status" \
+        --output text 2>/dev/null || echo "Unknown")
+    
+    if [ "$ENV_STATUS" = "Ready" ] || [ "$ENV_STATUS" = "Updating" ]; then
+        print_status "Environment exists and is usable (Status: $ENV_STATUS), updating to new version..."
+        aws elasticbeanstalk update-environment \
+            --application-name "$APP_NAME" \
+            --environment-name "$ENV_NAME" \
+            --version-label "$VERSION_LABEL" \
+            --region $REGION
+        print_success "Environment updated"
+    else
+        print_warning "Environment exists but is in state: $ENV_STATUS"
+        print_status "Terminating existing environment and creating new one..."
+        ENV_ID=$(aws elasticbeanstalk describe-environments \
+            --application-name "$APP_NAME" \
+            --environment-name "$ENV_NAME" \
+            --region $REGION \
+            --query "Environments[0].EnvironmentId" \
+            --output text)
+        
+        aws elasticbeanstalk terminate-environment \
+            --environment-id "$ENV_ID" \
+            --region $REGION
+        
+        # Wait for termination
+        print_status "Waiting for environment termination..."
+        sleep 30
+        
+        # Create new environment
+        aws elasticbeanstalk create-environment \
+            --application-name "$APP_NAME" \
+            --environment-name "$ENV_NAME" \
+            --solution-stack-name "$SOLUTION_STACK" \
+            --version-label "$VERSION_LABEL" \
+            --option-settings \
+                "Namespace=aws:autoscaling:launchconfiguration,OptionName=InstanceType,Value=t2.micro" \
+                "Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=aws-elasticbeanstalk-ec2-role" \
+            --region $REGION
+        print_success "New environment created"
+    fi
 fi
 echo ""
 
