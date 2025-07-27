@@ -24,7 +24,7 @@ jobs:
     - name: Build Java application
       run: |
         javac HelloWorld.java
-        jar cmvf src/META-INF/MANIFEST.MF HelloWorld.jar *.class
+        jar cvfe HelloWorld.jar HelloWorld *.class
 
     - name: Install AWS CLI
       run: |
@@ -54,7 +54,7 @@ jobs:
       run: |
         aws elasticbeanstalk update-environment \
           --application-name ${{ secrets.BEANSTALK_APP_NAME }} \
-          --environment-name ${{ secrets.BEANSTALK_ENV_NAME }} \ 
+          --environment-name ${{ secrets.BEANSTALK_ENV_NAME }} \
           --version-label "${{ github.sha }}"
 
     - name: Health check
